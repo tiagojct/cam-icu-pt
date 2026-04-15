@@ -544,6 +544,11 @@
     <div class="header-badge">Avaliação Clínica</div>
     <h1>CAM-ICU</h1>
     <p>Confusion Assessment Method para Unidade de Cuidados Intensivos</p>
+    <div id="counterDisplay" style="display:inline-flex; align-items:center; gap:8px; margin-top:10px; background:var(--white); border:1.5px solid var(--border); border-radius:20px; padding:5px 14px; font-size:13px; color:var(--text-muted); box-shadow:var(--shadow-sm);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <span>Avaliações realizadas neste dispositivo: <strong id="counterValue">0</strong></span>
+      <button onclick="confirmResetCounter()" title="Repor contador" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0;font-size:12px;line-height:1;opacity:0.6;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">↺</button>
+    </div>
   </div>
 
   <!-- Progress -->
@@ -1060,6 +1065,8 @@ function showResult() {
   for (let i = 1; i <= 4; i++) {
     document.getElementById('step' + i).className = 'progress-step done';
   }
+
+  incrementCounter();
 }
 
 function resetAll() {
@@ -1094,8 +1101,27 @@ function resetAll() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// Counter
+function getCount() {
+  return parseInt(localStorage.getItem('camicu_count') || '0', 10);
+}
+function updateCounterUI() {
+  document.getElementById('counterValue').textContent = getCount();
+}
+function incrementCounter() {
+  localStorage.setItem('camicu_count', getCount() + 1);
+  updateCounterUI();
+}
+function confirmResetCounter() {
+  if (confirm('Repor o contador de avaliações para zero?')) {
+    localStorage.setItem('camicu_count', '0');
+    updateCounterUI();
+  }
+}
+
 // Start
 init();
+updateCounterUI();
 </script>
 </body>
 </html>
