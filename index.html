@@ -544,10 +544,20 @@
     <div class="header-badge">Avaliação Clínica</div>
     <h1>CAM-ICU</h1>
     <p>Confusion Assessment Method para Unidade de Cuidados Intensivos</p>
-    <div id="counterDisplay" style="display:inline-flex; align-items:center; gap:8px; margin-top:10px; background:var(--white); border:1.5px solid var(--border); border-radius:20px; padding:5px 14px; font-size:13px; color:var(--text-muted); box-shadow:var(--shadow-sm);">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-      <span>Avaliações realizadas neste dispositivo: <strong id="counterValue">0</strong></span>
-      <button onclick="confirmResetCounter()" title="Repor contador" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0;font-size:12px;line-height:1;opacity:0.6;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">↺</button>
+    <div id="counterDisplay" style="display:inline-flex; align-items:center; gap:10px; margin-top:10px; background:var(--white); border:1.5px solid var(--border); border-radius:20px; padding:6px 16px; font-size:13px; color:var(--text-muted); box-shadow:var(--shadow-sm); flex-wrap:wrap; justify-content:center;">
+      <span style="display:flex;align-items:center;gap:5px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Total: <strong id="counterTotal">—</strong>
+      </span>
+      <span style="color:var(--border)">|</span>
+      <span style="display:flex;align-items:center;gap:4px;">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--danger);display:inline-block;"></span>
+        Positivos: <strong id="counterPositive">—</strong>
+      </span>
+      <span style="display:flex;align-items:center;gap:4px;">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block;"></span>
+        Negativos: <strong id="counterNegative">—</strong>
+      </span>
     </div>
   </div>
 
@@ -1066,7 +1076,7 @@ function showResult() {
     document.getElementById('step' + i).className = 'progress-step done';
   }
 
-  incrementCounter();
+  submitAssessment(positive ? 'positive' : 'negative');
 }
 
 function resetAll() {
@@ -1101,27 +1111,68 @@ function resetAll() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Counter
-function getCount() {
-  return parseInt(localStorage.getItem('camicu_count') || '0', 10);
-}
-function updateCounterUI() {
-  document.getElementById('counterValue').textContent = getCount();
-}
-function incrementCounter() {
-  localStorage.setItem('camicu_count', getCount() + 1);
-  updateCounterUI();
-}
-function confirmResetCounter() {
-  if (confirm('Repor o contador de avaliações para zero?')) {
-    localStorage.setItem('camicu_count', '0');
-    updateCounterUI();
+// Supabase config
+const SUPABASE_URL = 'https://rbtjuubnsxqdrvmzixsj.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_VaXWcr2mes_ZiZq4Lj-SKw_hUZwk5rz';
+
+// Shared counter (Supabase)
+async function submitAssessment(result) {
+  // Optimistic local increment
+  const prev = JSON.parse(localStorage.getItem('camicu_stats') || '{"total":0,"positive":0,"negative":0}');
+  prev.total++;
+  prev[result]++;
+  localStorage.setItem('camicu_stats', JSON.stringify(prev));
+  renderStats(prev.total, prev.positive, prev.negative);
+
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/assessments`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ result })
+    });
+    await loadSharedStats();
+  } catch (e) {
+    console.warn('Supabase inacessível — contador local usado.', e);
   }
+}
+
+async function loadSharedStats() {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/assessments?select=result`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    if (!res.ok) throw new Error(res.status);
+    const rows = await res.json();
+    const total    = rows.length;
+    const positive = rows.filter(r => r.result === 'positive').length;
+    const negative = total - positive;
+    // Sync local cache
+    localStorage.setItem('camicu_stats', JSON.stringify({ total, positive, negative }));
+    renderStats(total, positive, negative);
+  } catch (e) {
+    console.warn('Não foi possível carregar estatísticas partilhadas.', e);
+    // Fall back to local cache
+    const cached = JSON.parse(localStorage.getItem('camicu_stats') || 'null');
+    if (cached) renderStats(cached.total, cached.positive, cached.negative);
+    else renderStats('—', '—', '—');
+  }
+}
+
+function renderStats(total, positive, negative) {
+  document.getElementById('counterTotal').textContent    = total;
+  document.getElementById('counterPositive').textContent = positive;
+  document.getElementById('counterNegative').textContent = negative;
 }
 
 // Start
 init();
-updateCounterUI();
+loadSharedStats();
 </script>
 </body>
 </html>
