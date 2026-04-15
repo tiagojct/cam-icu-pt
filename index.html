@@ -682,24 +682,8 @@
 
       <ul class="questions-list" id="questionsList"></ul>
 
-      <div class="divider">Teste de Comando</div>
-
-      <div class="command-box">
-        <div class="cmd-title">Instruções ao clínico</div>
-        <p>Mostre ao doente <strong>2 dedos</strong> e diga: <em>"Levante este número de dedos."</em></p>
-        <p style="margin-top:6px;">Depois, sem demonstrar, diga: <em>"Agora faça o mesmo com a outra mão"</em> — <strong>OU</strong>, se o doente não conseguir mover os dois braços, peça: <em>"Acrescente mais um dedo."</em></p>
-      </div>
-
-      <div style="margin: 8px 0 14px">
-        <p class="question" style="margin-bottom:8px;">O doente cumpriu o comando corretamente?</p>
-        <div class="btn-group">
-          <button class="btn" id="cmd-yes" onclick="setCommand(true)">✓ Sim</button>
-          <button class="btn" id="cmd-no" onclick="setCommand(false)">✕ Não</button>
-        </div>
-      </div>
-
       <div class="error-counter">
-        Total de erros (perguntas + comando): <span id="f4ErrorCount">0</span>
+        Erros: <span id="f4ErrorCount">0</span>
       </div>
 
       <button class="confirm-btn" id="confirmF4" onclick="confirmFeature4()" disabled style="width:100%; margin-top:12px;">
@@ -730,11 +714,9 @@ const state = {
   rassScore: null,
   f4: null,
   f4Errors: 0,
-  cmdCorrect: null,
   letterState: [], // per letter: null | 'squeezed' | 'not-squeezed'
   lettersConfirmed: false,
   questionAnswers: [], // per question: null | 'correct' | 'wrong'
-  cmdAnswered: false,
 };
 
 // Data
@@ -876,8 +858,16 @@ function selectRASS(score, tr) {
   state.rassScore = score;
   state.f3 = score !== 0;
   updateFeature3UI();
-  setTimeout(() => openCard(4), 400);
-  setProgress(4);
+  if (state.f3) {
+    // F3 positiva → CAM-ICU positivo, não é necessário avaliar F4
+    collapseCard(4, true);
+    state.f4 = null;
+    setTimeout(() => showResult(), 400);
+  } else {
+    // F3 negativa (RASS = 0) → avaliar F4
+    setTimeout(() => openCard(4), 400);
+    setProgress(4);
+  }
 }
 
 function updateFeature3UI() {
@@ -894,7 +884,6 @@ function initF4() {
   const list = document.getElementById('questionsList');
   list.innerHTML = '';
   state.questionAnswers = F4_QUESTIONS.map(() => null);
-  state.cmdCorrect = null;
   F4_QUESTIONS.forEach((item, i) => {
     const li = document.createElement('li');
     li.className = 'question-item';
@@ -921,19 +910,9 @@ function setQuestionAnswer(i, correct) {
   checkF4Complete();
 }
 
-function setCommand(correct) {
-  state.cmdCorrect = correct;
-  state.cmdAnswered = true;
-  document.getElementById('cmd-yes').className = 'btn' + (correct ? ' selected-no' : '');
-  document.getElementById('cmd-no').className = 'btn' + (!correct ? ' selected-yes' : '');
-  updateF4Errors();
-  checkF4Complete();
-}
-
 function updateF4Errors() {
   let errors = 0;
   state.questionAnswers.forEach(a => { if (a === 'wrong') errors++; });
-  if (state.cmdCorrect === false) errors++;
   state.f4Errors = errors;
   const el = document.getElementById('f4ErrorCount');
   el.textContent = errors;
@@ -942,8 +921,7 @@ function updateF4Errors() {
 
 function checkF4Complete() {
   const allQ = state.questionAnswers.every(a => a !== null);
-  const cmdDone = state.cmdCorrect !== null;
-  document.getElementById('confirmF4').disabled = !(allQ && cmdDone);
+  document.getElementById('confirmF4').disabled = !allQ;
 }
 
 function confirmFeature4() {
@@ -1084,9 +1062,9 @@ function resetAll() {
   Object.assign(state, {
     f1: null, f2: null, f2Errors: 0,
     f3: null, rassScore: null,
-    f4: null, f4Errors: 0, cmdCorrect: null,
+    f4: null, f4Errors: 0,
     letterState: [], lettersConfirmed: false,
-    questionAnswers: [], cmdAnswered: false,
+    questionAnswers: [],
   });
 
   // Reset UI
