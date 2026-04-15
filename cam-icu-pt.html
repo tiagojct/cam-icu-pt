@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAM-ICU — Avaliação de Delírio em UCI</title>
+<style>
+  :root {
+    --primary: #1a6fa8;
+    --primary-dark: #14527d;
+    --primary-light: #e8f3fb;
+    --success: #1a8a4a;
+    --success-light: #e8f5ee;
+    --danger: #c0392b;
+    --danger-light: #fdf0ef;
+    --warning: #e67e22;
+    --warning-light: #fef6ec;
+    --neutral: #6b7280;
+    --neutral-light: #f3f4f6;
+    --white: #ffffff;
+    --text: #1a202c;
+    --text-muted: #6b7280;
+    --border: #e2e8f0;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.08);
+    --shadow-sm: 0 2px 8px rgba(0,0,0,0.06);
+    --transition: 0.2s ease;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #f0f4f8;
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 48px;
+    line-height: 1.5;
+  }
+
+  .container {
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .header-badge {
+    display: inline-block;
+    background: var(--primary);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+  }
+  .header h1 {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+    letter-spacing: -0.5px;
+  }
+  .header p {
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+
+  /* Progress */
+  .progress-bar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 24px;
+    align-items: center;
+  }
+  .progress-step {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    transition: background var(--transition);
+  }
+  .progress-step.done { background: var(--success); }
+  .progress-step.active { background: var(--primary); }
+
+  /* Card */
+  .card {
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: box-shadow var(--transition);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+    background: var(--white);
+  }
+
+  .feature-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary-light);
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+  .feature-badge.done-badge { background: var(--success-light); color: var(--success); }
+  .feature-badge.skip-badge { background: var(--neutral-light); color: var(--neutral); }
+
+  .card-header-text {}
+  .card-header-text .feature-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+  }
+  .card-header-text h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .card-status {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .card-status.positive { background: var(--danger-light); color: var(--danger); }
+  .card-status.negative { background: var(--success-light); color: var(--success); }
+  .card-status.pending { background: var(--neutral-light); color: var(--neutral); }
+
+  .card-body {
+    padding: 20px 22px;
+  }
+
+  /* Question text */
+  .question {
+    font-size: 15px;
+    color: var(--text);
+    margin-bottom: 14px;
+    line-height: 1.6;
+  }
+
+  .question strong { color: var(--primary-dark); }
+
+  .help-text {
+    font-size: 13px;
+    color: var(--text-muted);
+    background: var(--neutral-light);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    line-height: 1.5;
+  }
+
+  /* Yes/No buttons */
+  .btn-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 12px 20px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+
+  .btn.selected-yes {
+    border-color: var(--danger);
+    background: var(--danger-light);
+    color: var(--danger);
+  }
+  .btn.selected-no {
+    border-color: var(--success);
+    background: var(--success-light);
+    color: var(--success);
+  }
+  .btn.selected-neutral {
+    border-color: var(--neutral);
+    background: var(--neutral-light);
+    color: var(--neutral);
+  }
+
+  /* RASS */
+  .rass-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+  .rass-table th {
+    background: var(--primary-light);
+    color: var(--primary-dark);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 8px 12px;
+    text-align: left;
+  }
+  .rass-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .rass-table tr:last-child td { border-bottom: none; }
+  .rass-table tr:hover td { background: var(--primary-light); cursor: pointer; }
+  .rass-table tr.rass-selected td {
+    background: var(--primary-light);
+  }
+  .rass-score {
+    font-weight: 700;
+    color: var(--primary);
+    white-space: nowrap;
+    width: 42px;
+  }
+  .rass-label { font-weight: 600; }
+  .rass-desc { color: var(--text-muted); font-size: 13px; }
+  .rass-table tr.rass-selected .rass-score { color: var(--primary-dark); }
+  .rass-table tr.rass-zero td { border-top: 2px solid var(--primary); border-bottom: 2px solid var(--primary); }
+  .rass-table tr.rass-selected td:first-child {
+    border-left: 3px solid var(--primary);
+  }
+
+  /* Letters test */
+  .letters-display {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+    justify-content: center;
+  }
+  .letter-box {
+    width: 42px;
+    height: 48px;
+    border-radius: var(--radius-sm);
+    background: var(--primary-light);
+    border: 2px solid var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--primary);
+    cursor: pointer;
+    transition: all var(--transition);
+    position: relative;
+    user-select: none;
+  }
+  .letter-box.target { background: #fff3cd; border-color: var(--warning); color: var(--warning); }
+  .letter-box.correct-squeeze { background: var(--success-light); border-color: var(--success); color: var(--success); }
+  .letter-box.wrong-squeeze { background: var(--danger-light); border-color: var(--danger); color: var(--danger); }
+  .letter-box.missed { background: var(--danger-light); border-color: var(--danger); color: var(--danger); }
+  .letter-box.confirmed { opacity: 0.7; cursor: default; }
+
+  .letters-instructions {
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .error-counter {
+    text-align: center;
+    font-size: 15px;
+    font-weight: 600;
+    margin: 12px 0;
+    color: var(--text);
+  }
+  .error-counter span {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 20px;
+    background: var(--neutral-light);
+    color: var(--text);
+  }
+  .error-counter span.has-errors { background: var(--danger-light); color: var(--danger); }
+
+  /* Disorganized thinking */
+  .questions-list { list-style: none; }
+  .question-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .question-item:last-child { border-bottom: none; }
+  .question-item .q-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--primary-light);
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .question-item .q-text { flex: 1; font-size: 14px; color: var(--text); }
+  .question-item .q-expected { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .q-answer-btns { display: flex; gap: 6px; margin-left: auto; flex-shrink: 0; }
+  .q-btn {
+    padding: 5px 14px;
+    border-radius: 6px;
+    border: 1.5px solid var(--border);
+    background: var(--white);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+    color: var(--text);
+  }
+  .q-btn:hover { border-color: var(--primary); color: var(--primary); }
+  .q-btn.correct-sel { border-color: var(--success); background: var(--success-light); color: var(--success); }
+  .q-btn.wrong-sel { border-color: var(--danger); background: var(--danger-light); color: var(--danger); }
+
+  /* Command section */
+  .command-box {
+    background: var(--primary-light);
+    border: 1.5px solid #b3d4ec;
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    margin: 14px 0;
+  }
+  .command-box .cmd-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--primary);
+    margin-bottom: 6px;
+  }
+  .command-box p { font-size: 14px; color: var(--text); }
+
+  /* Divider */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Result */
+  .result-card {
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    margin-bottom: 16px;
+    text-align: center;
+    animation: fadeIn 0.4s ease;
+  }
+  .result-card.positive-result {
+    background: linear-gradient(135deg, #c0392b, #e74c3c);
+    color: white;
+    box-shadow: 0 8px 32px rgba(192,57,43,0.3);
+  }
+  .result-card.negative-result {
+    background: linear-gradient(135deg, #1a8a4a, #27ae60);
+    color: white;
+    box-shadow: 0 8px 32px rgba(26,138,74,0.25);
+  }
+  .result-card.incomplete-result {
+    background: linear-gradient(135deg, #636e72, #95a5a6);
+    color: white;
+    box-shadow: 0 8px 32px rgba(99,110,114,0.25);
+  }
+  .result-icon { font-size: 48px; margin-bottom: 12px; }
+  .result-title { font-size: 24px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.5px; }
+  .result-subtitle { font-size: 15px; opacity: 0.9; margin-bottom: 16px; }
+  .result-features {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .result-feature-chip {
+    padding: 5px 12px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.2);
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .reset-btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    background: var(--white);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition);
+    text-align: center;
+  }
+  .reset-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+  /* Collapsed card */
+  .card.collapsed .card-body { display: none; }
+  .card.skipped { opacity: 0.65; }
+
+  /* Animations */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-in { animation: fadeIn 0.3s ease; }
+
+  /* Footnote */
+  .footnote {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 24px;
+    line-height: 1.6;
+  }
+  .footnote a { color: var(--primary); text-decoration: none; }
+
+  /* Mobile adjustments */
+  @media (max-width: 480px) {
+    .letters-display { gap: 5px; }
+    .letter-box { width: 34px; height: 40px; font-size: 16px; }
+    .btn-group { flex-direction: column; }
+    .q-answer-btns { flex-direction: column; gap: 4px; }
+    .card-header { padding: 14px 16px; }
+    .card-body { padding: 16px; }
+    .result-card { padding: 22px 16px; }
+  }
+
+  /* Tooltip */
+  .info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--neutral-light);
+    color: var(--neutral);
+    font-size: 10px;
+    font-weight: 700;
+    cursor: help;
+    border: 1px solid var(--border);
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+
+  /* Score dot */
+  .score-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--text-muted);
+    background: var(--neutral-light);
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-top: 8px;
+  }
+
+  /* Subtle secondary btn */
+  .confirm-btn {
+    margin-top: 14px;
+    padding: 10px 22px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition);
+  }
+  .confirm-btn:hover { background: var(--primary-dark); }
+  .confirm-btn:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-badge">Avaliação Clínica</div>
+    <h1>CAM-ICU</h1>
+    <p>Confusion Assessment Method para Unidade de Cuidados Intensivos</p>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-step active" id="step1"></div>
+    <div class="progress-step" id="step2"></div>
+    <div class="progress-step" id="step3"></div>
+    <div class="progress-step" id="step4"></div>
+  </div>
+
+  <!-- FEATURE 1 -->
+  <div class="card animate-in" id="card1">
+    <div class="card-header">
+      <div class="feature-badge" id="badge1">1</div>
+      <div class="card-header-text">
+        <div class="feature-label">Característica 1</div>
+        <h2>Início Agudo ou Curso Flutuante</h2>
+      </div>
+      <div class="card-status pending" id="status1">—</div>
+    </div>
+    <div class="card-body" id="body1">
+      <p class="question">Existe evidência de uma <strong>alteração aguda do estado mental</strong> em relação ao estado basal do doente?</p>
+      <p class="question">— <em>OU</em> —</p>
+      <p class="question">O estado mental do doente <strong>flutuou nas últimas 24 horas</strong>, evidenciado por variações na escala de sedação/agitação (p. ex. RASS) ou no GCS?</p>
+      <div class="help-text">
+        ℹ️ Característica presente se <strong>pelo menos uma das condições</strong> for verdadeira. Normalmente avaliada por observação clínica ou informação de familiares e enfermeiros.
+      </div>
+      <div class="btn-group">
+        <button class="btn" id="f1-yes" onclick="setFeature1(true)">✓ Sim — Presente</button>
+        <button class="btn" id="f1-no" onclick="setFeature1(false)">✕ Não — Ausente</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURE 2 -->
+  <div class="card collapsed" id="card2">
+    <div class="card-header">
+      <div class="feature-badge" id="badge2">2</div>
+      <div class="card-header-text">
+        <div class="feature-label">Característica 2</div>
+        <h2>Desatenção</h2>
+      </div>
+      <div class="card-status pending" id="status2">—</div>
+    </div>
+    <div class="card-body" id="body2">
+      <p class="question">Realize o <strong>Teste de Atenção com Letras</strong>. Leia a sequência abaixo em voz alta, uma letra de cada vez (~1 segundo por letra), pedindo ao doente que <strong>aperte a mão</strong> sempre que ouvir a letra <strong>"A"</strong>.</p>
+
+      <div class="help-text">
+        ℹ️ Diga ao doente: <em>"Vou ler-lhe uma série de letras. Sempre que ouvir a letra 'A', aperte a minha mão."</em>
+      </div>
+
+      <div class="letters-instructions">Toque numa letra para <strong>assinalar erro</strong> do doente. Por defeito, todas estão corretas.</div>
+
+      <div class="letters-display" id="lettersDisplay"></div>
+
+      <div style="display:flex; gap:16px; justify-content:center; margin:8px 0 4px; font-size:12px; color:var(--text-muted);">
+        <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#fff3cd;border:1.5px solid var(--warning)"></span> "A" — apertar</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:var(--primary-light);border:1.5px solid var(--primary)"></span> Outra — não apertar</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:var(--danger-light);border:1.5px solid var(--danger)"></span> Erro</span>
+      </div>
+
+      <div class="error-counter">
+        Erros: <span id="errorCount">0</span>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
+          (erro = apertar quando não devia OU não apertar quando devia)
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:4px;">
+        <button class="confirm-btn" id="confirmLetters" onclick="confirmLettersTest()" style="flex:1">
+          Confirmar Resultado →
+        </button>
+        <button onclick="resetLetters()" style="padding:10px 16px; background:var(--neutral-light); color:var(--text-muted); border:none; border-radius:var(--radius-sm); font-size:13px; font-weight:600; cursor:pointer;">
+          ↺ Recomeçar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURE 3 -->
+  <div class="card collapsed" id="card3">
+    <div class="card-header">
+      <div class="feature-badge" id="badge3">3</div>
+      <div class="card-header-text">
+        <div class="feature-label">Característica 3</div>
+        <h2>Nível de Consciência Alterado</h2>
+      </div>
+      <div class="card-status pending" id="status3">—</div>
+    </div>
+    <div class="card-body" id="body3">
+      <p class="question">Selecione a pontuação <strong>RASS atual</strong> do doente:</p>
+      <div class="help-text">
+        ℹ️ Característica <strong>positiva</strong> se RASS ≠ 0 (qualquer grau de agitação ou sedação). Característica <strong>negativa</strong> se RASS = 0 (alerta e calmo).
+      </div>
+
+      <table class="rass-table">
+        <thead>
+          <tr>
+            <th>Pontuação</th>
+            <th>Designação</th>
+            <th>Descrição</th>
+          </tr>
+        </thead>
+        <tbody id="rassTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- FEATURE 4 -->
+  <div class="card collapsed" id="card4">
+    <div class="card-header">
+      <div class="feature-badge" id="badge4">4</div>
+      <div class="card-header-text">
+        <div class="feature-label">Característica 4</div>
+        <h2>Pensamento Desorganizado</h2>
+      </div>
+      <div class="card-status pending" id="status4">—</div>
+    </div>
+    <div class="card-body" id="body4">
+      <p class="question">Faça ao doente as <strong>4 perguntas</strong> abaixo e registar o número de respostas incorretas:</p>
+
+      <ul class="questions-list" id="questionsList"></ul>
+
+      <div class="divider">Teste de Comando</div>
+
+      <div class="command-box">
+        <div class="cmd-title">Instruções ao clínico</div>
+        <p>Mostre ao doente <strong>2 dedos</strong> e diga: <em>"Levante este número de dedos."</em></p>
+        <p style="margin-top:6px;">Depois, sem demonstrar, diga: <em>"Agora faça o mesmo com a outra mão"</em> — <strong>OU</strong>, se o doente não conseguir mover os dois braços, peça: <em>"Acrescente mais um dedo."</em></p>
+      </div>
+
+      <div style="margin: 8px 0 14px">
+        <p class="question" style="margin-bottom:8px;">O doente cumpriu o comando corretamente?</p>
+        <div class="btn-group">
+          <button class="btn" id="cmd-yes" onclick="setCommand(true)">✓ Sim</button>
+          <button class="btn" id="cmd-no" onclick="setCommand(false)">✕ Não</button>
+        </div>
+      </div>
+
+      <div class="error-counter">
+        Total de erros (perguntas + comando): <span id="f4ErrorCount">0</span>
+      </div>
+
+      <button class="confirm-btn" id="confirmF4" onclick="confirmFeature4()" disabled style="width:100%; margin-top:12px;">
+        Confirmar Resultado →
+      </button>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="resultSection" style="display:none;"></div>
+
+  <button class="reset-btn" onclick="resetAll()">↺ Nova Avaliação</button>
+
+  <div class="footnote">
+    Adaptado do original de Ely et al. (2001) · <em>JAMA</em> 286(21):2703–2710<br>
+    Versão portuguesa para uso clínico · Não substitui o julgamento clínico
+  </div>
+
+</div>
+
+<script>
+// State
+const state = {
+  f1: null,
+  f2: null,       // null | true (>2 errors) | false (≤2 errors)
+  f2Errors: 0,
+  f3: null,       // null | true (RASS≠0) | false (RASS=0)
+  rassScore: null,
+  f4: null,
+  f4Errors: 0,
+  cmdCorrect: null,
+  letterState: [], // per letter: null | 'squeezed' | 'not-squeezed'
+  lettersConfirmed: false,
+  questionAnswers: [], // per question: null | 'correct' | 'wrong'
+  cmdAnswered: false,
+};
+
+// Data
+const LETTERS = ['S','A','V','E','A','H','A','A','R','T'];
+const TARGET_LETTER = 'A';
+const TARGET_POSITIONS = LETTERS.map((l,i) => l === TARGET_LETTER ? i : -1).filter(i => i >= 0);
+
+const RASS_SCALE = [
+  { score: 4,  label: 'Combativo',     desc: 'Violento, perigoso para a equipa' },
+  { score: 3,  label: 'Muito agitado', desc: 'Tira tubos/cateteres, agressivo' },
+  { score: 2,  label: 'Agitado',       desc: 'Movimentos frequentes sem propósito, luta com o ventilador' },
+  { score: 1,  label: 'Inquieto',      desc: 'Ansioso, movimentos não agressivos nem vigorosos' },
+  { score: 0,  label: 'Alerta e calmo', desc: 'Estado ideal de alerta' },
+  { score: -1, label: 'Sonolento',     desc: 'Não totalmente alerta, mas mantém despertar (>10s) a voz' },
+  { score: -2, label: 'Sedação ligeira', desc: 'Breve despertar com contacto visual (<10s) a voz' },
+  { score: -3, label: 'Sedação moderada', desc: 'Algum movimento ou abertura dos olhos, sem contacto visual, a voz' },
+  { score: -4, label: 'Sedação profunda', desc: 'Sem resposta a voz, movimento ou abertura dos olhos a estimulação física' },
+  { score: -5, label: 'Não despertável', desc: 'Sem resposta a voz ou estimulação física' },
+];
+
+const F4_QUESTIONS = [
+  { q: 'Uma pedra flutua na água?',             answer: 'Não' },
+  { q: 'Existem peixes no mar?',                 answer: 'Sim' },
+  { q: 'Um quilograma pesa mais do que dois quilogramas?', answer: 'Não' },
+  { q: 'Pode usar um martelo para pregar um prego?', answer: 'Sim' },
+];
+
+// Init
+function init() {
+  initLetters();
+  initRASS();
+  initF4();
+}
+
+function initLetters() {
+  const display = document.getElementById('lettersDisplay');
+  display.innerHTML = '';
+  // Default: each letter starts as "correct" (A = squeezed, other = not-squeezed)
+  state.letterState = LETTERS.map(l => l === TARGET_LETTER ? 'squeezed' : 'not-squeezed');
+  LETTERS.forEach((letter, i) => {
+    const box = document.createElement('div');
+    box.className = 'letter-box' + (letter === TARGET_LETTER ? ' target' : '');
+    box.textContent = letter;
+    box.dataset.index = i;
+    box.onclick = () => toggleLetter(i);
+    box.id = 'letterBox' + i;
+    display.appendChild(box);
+  });
+  updateErrorCount();
+}
+
+function toggleLetter(i) {
+  if (state.lettersConfirmed) return;
+  const isTarget = LETTERS[i] === TARGET_LETTER;
+  const current = state.letterState[i];
+  // Toggle between correct and error
+  const correct = isTarget ? 'squeezed' : 'not-squeezed';
+  const error   = isTarget ? 'not-squeezed' : 'squeezed';
+  state.letterState[i] = (current === correct) ? error : correct;
+  updateLetterBox(i);
+  updateErrorCount();
+}
+
+function updateLetterBox(i) {
+  const box = document.getElementById('letterBox' + i);
+  const isTarget = LETTERS[i] === TARGET_LETTER;
+  const s = state.letterState[i];
+  const isError = (isTarget && s === 'not-squeezed') || (!isTarget && s === 'squeezed');
+
+  box.className = 'letter-box';
+  if (isError) {
+    box.classList.add(isTarget ? 'missed' : 'wrong-squeeze');
+    box.title = isTarget ? 'Erro: não apertou no "A"' : 'Erro: apertou indevidamente';
+  } else {
+    box.classList.add(isTarget ? 'target' : '');
+    box.title = isTarget ? 'Correto: apertou no "A"' : 'Correto: não apertou';
+  }
+  if (state.lettersConfirmed) box.classList.add('confirmed');
+}
+
+function updateErrorCount() {
+  let errors = 0;
+  LETTERS.forEach((letter, i) => {
+    const isTarget = letter === TARGET_LETTER;
+    const s = state.letterState[i];
+    if (isTarget && s === 'not-squeezed') errors++;
+    if (!isTarget && s === 'squeezed') errors++;
+  });
+  state.f2Errors = errors;
+  const el = document.getElementById('errorCount');
+  el.textContent = errors;
+  el.className = errors > 0 ? 'has-errors' : '';
+}
+
+function resetLetters() {
+  state.lettersConfirmed = false;
+  initLetters();
+}
+
+function confirmLettersTest() {
+  state.lettersConfirmed = true;
+  const errors = state.f2Errors;
+  state.f2 = errors > 2;
+  updateFeature2UI();
+  document.querySelectorAll('.letter-box').forEach(b => b.classList.add('confirmed'));
+  // Move to next
+  setTimeout(() => openCard(3), 400);
+  setProgress(3);
+}
+
+function updateFeature2UI() {
+  const positive = state.f2;
+  const statusEl = document.getElementById('status2');
+  statusEl.textContent = positive ? `Positivo (${state.f2Errors} erros)` : `Negativo (${state.f2Errors} erros)`;
+  statusEl.className = 'card-status ' + (positive ? 'positive' : 'negative');
+  document.getElementById('badge2').className = 'feature-badge done-badge';
+  document.getElementById('badge2').textContent = positive ? '✕' : '✓';
+}
+
+function initRASS() {
+  const tbody = document.getElementById('rassTableBody');
+  tbody.innerHTML = '';
+  RASS_SCALE.forEach(item => {
+    const tr = document.createElement('tr');
+    if (item.score === 0) tr.classList.add('rass-zero');
+    tr.innerHTML = `
+      <td class="rass-score">${item.score > 0 ? '+' : ''}${item.score}</td>
+      <td class="rass-label">${item.label}</td>
+      <td class="rass-desc">${item.desc}</td>
+    `;
+    tr.onclick = () => selectRASS(item.score, tr);
+    tbody.appendChild(tr);
+  });
+}
+
+function selectRASS(score, tr) {
+  document.querySelectorAll('#rassTableBody tr').forEach(r => r.classList.remove('rass-selected'));
+  tr.classList.add('rass-selected');
+  state.rassScore = score;
+  state.f3 = score !== 0;
+  updateFeature3UI();
+  setTimeout(() => openCard(4), 400);
+  setProgress(4);
+}
+
+function updateFeature3UI() {
+  const positive = state.f3;
+  const statusEl = document.getElementById('status3');
+  const scoreStr = state.rassScore !== null ? ` (RASS ${state.rassScore > 0 ? '+' : ''}${state.rassScore})` : '';
+  statusEl.textContent = positive ? `Positivo${scoreStr}` : `Negativo${scoreStr}`;
+  statusEl.className = 'card-status ' + (positive ? 'positive' : 'negative');
+  document.getElementById('badge3').className = 'feature-badge done-badge';
+  document.getElementById('badge3').textContent = positive ? '✕' : '✓';
+}
+
+function initF4() {
+  const list = document.getElementById('questionsList');
+  list.innerHTML = '';
+  state.questionAnswers = F4_QUESTIONS.map(() => null);
+  state.cmdCorrect = null;
+  F4_QUESTIONS.forEach((item, i) => {
+    const li = document.createElement('li');
+    li.className = 'question-item';
+    li.innerHTML = `
+      <div class="q-num">${i + 1}</div>
+      <div style="flex:1">
+        <div class="q-text">${item.q}</div>
+        <div class="q-expected">Resposta esperada: <strong>${item.answer}</strong></div>
+      </div>
+      <div class="q-answer-btns">
+        <button class="q-btn" id="q${i}-correct" onclick="setQuestionAnswer(${i}, true)">✓ Correta</button>
+        <button class="q-btn" id="q${i}-wrong" onclick="setQuestionAnswer(${i}, false)">✕ Errada</button>
+      </div>
+    `;
+    list.appendChild(li);
+  });
+}
+
+function setQuestionAnswer(i, correct) {
+  state.questionAnswers[i] = correct ? 'correct' : 'wrong';
+  document.getElementById(`q${i}-correct`).className = 'q-btn' + (correct ? ' correct-sel' : '');
+  document.getElementById(`q${i}-wrong`).className = 'q-btn' + (!correct ? ' wrong-sel' : '');
+  updateF4Errors();
+  checkF4Complete();
+}
+
+function setCommand(correct) {
+  state.cmdCorrect = correct;
+  state.cmdAnswered = true;
+  document.getElementById('cmd-yes').className = 'btn' + (correct ? ' selected-no' : '');
+  document.getElementById('cmd-no').className = 'btn' + (!correct ? ' selected-yes' : '');
+  updateF4Errors();
+  checkF4Complete();
+}
+
+function updateF4Errors() {
+  let errors = 0;
+  state.questionAnswers.forEach(a => { if (a === 'wrong') errors++; });
+  if (state.cmdCorrect === false) errors++;
+  state.f4Errors = errors;
+  const el = document.getElementById('f4ErrorCount');
+  el.textContent = errors;
+  el.className = errors > 1 ? 'has-errors' : '';
+}
+
+function checkF4Complete() {
+  const allQ = state.questionAnswers.every(a => a !== null);
+  const cmdDone = state.cmdCorrect !== null;
+  document.getElementById('confirmF4').disabled = !(allQ && cmdDone);
+}
+
+function confirmFeature4() {
+  state.f4 = state.f4Errors > 1;
+  updateFeature4UI();
+  showResult();
+}
+
+function updateFeature4UI() {
+  const positive = state.f4;
+  const statusEl = document.getElementById('status4');
+  statusEl.textContent = positive ? `Positivo (${state.f4Errors} erros)` : `Negativo (${state.f4Errors} erros)`;
+  statusEl.className = 'card-status ' + (positive ? 'positive' : 'negative');
+  document.getElementById('badge4').className = 'feature-badge done-badge';
+  document.getElementById('badge4').textContent = positive ? '✕' : '✓';
+}
+
+// Feature 1
+function setFeature1(yes) {
+  state.f1 = yes;
+  document.getElementById('f1-yes').className = 'btn' + (yes ? ' selected-yes' : '');
+  document.getElementById('f1-no').className = 'btn' + (!yes ? ' selected-no' : '');
+
+  const statusEl = document.getElementById('status1');
+  statusEl.textContent = yes ? 'Positivo' : 'Negativo';
+  statusEl.className = 'card-status ' + (yes ? 'positive' : 'negative');
+  document.getElementById('badge1').className = 'feature-badge done-badge';
+  document.getElementById('badge1').textContent = yes ? '✕' : '✓';
+
+  if (!yes) {
+    // CAM-ICU cannot be positive if F1 is negative
+    collapseCard(2, true);
+    collapseCard(3, true);
+    collapseCard(4, true);
+    state.f2 = false; state.f3 = false; state.f4 = false;
+    showResult();
+  } else {
+    setTimeout(() => openCard(2), 300);
+    setProgress(2);
+  }
+}
+
+// Card helpers
+function openCard(n) {
+  const card = document.getElementById('card' + n);
+  card.classList.remove('collapsed', 'skipped');
+  card.classList.add('animate-in');
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function collapseCard(n, skip = false) {
+  const card = document.getElementById('card' + n);
+  card.classList.add('collapsed');
+  if (skip) card.classList.add('skipped');
+}
+
+function setProgress(active) {
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById('step' + i);
+    if (i < active) el.className = 'progress-step done';
+    else if (i === active) el.className = 'progress-step active';
+    else el.className = 'progress-step';
+  }
+}
+
+// Result
+function showResult() {
+  const { f1, f2, f3, f4 } = state;
+
+  // CAM-ICU positive: F1 + F2 + (F3 OR F4)
+  let positive = false;
+  let complete = true;
+
+  if (f1 === null || f2 === null) { complete = false; }
+  if (f1 && f2 && (f3 === null && f4 === null)) { complete = false; }
+
+  if (complete) {
+    positive = f1 && f2 && (f3 || f4);
+  }
+
+  const section = document.getElementById('resultSection');
+
+  const featureChips = (f) => {
+    const features = [
+      { n: 1, v: f1 },
+      { n: 2, v: f2 },
+      { n: 3, v: f3 },
+      { n: 4, v: f4 },
+    ].filter(x => x.v !== null);
+
+    return features.map(x =>
+      `<div class="result-feature-chip">${x.v ? '✕' : '✓'} F${x.n}: ${x.v ? 'Pos' : 'Neg'}</div>`
+    ).join('');
+  };
+
+  if (!f1) {
+    section.innerHTML = `
+      <div class="result-card negative-result animate-in">
+        <div class="result-icon">✓</div>
+        <div class="result-title">CAM-ICU Negativo</div>
+        <div class="result-subtitle">Delírio <strong>não detetado</strong> nesta avaliação<br><small>(Característica 1 ausente — critério mínimo não cumprido)</small></div>
+        <div class="result-features">${featureChips(state)}</div>
+      </div>
+    `;
+  } else if (positive) {
+    section.innerHTML = `
+      <div class="result-card positive-result animate-in">
+        <div class="result-icon">⚠</div>
+        <div class="result-title">CAM-ICU Positivo</div>
+        <div class="result-subtitle">Delírio <strong>detetado</strong> — considerar intervenção clínica</div>
+        <div class="result-features">${featureChips(state)}</div>
+      </div>
+    `;
+  } else {
+    section.innerHTML = `
+      <div class="result-card negative-result animate-in">
+        <div class="result-icon">✓</div>
+        <div class="result-title">CAM-ICU Negativo</div>
+        <div class="result-subtitle">Delírio <strong>não detetado</strong> nesta avaliação</div>
+        <div class="result-features">${featureChips(state)}</div>
+      </div>
+    `;
+  }
+
+  section.style.display = 'block';
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Update progress all done
+  for (let i = 1; i <= 4; i++) {
+    document.getElementById('step' + i).className = 'progress-step done';
+  }
+}
+
+function resetAll() {
+  // Reset state
+  Object.assign(state, {
+    f1: null, f2: null, f2Errors: 0,
+    f3: null, rassScore: null,
+    f4: null, f4Errors: 0, cmdCorrect: null,
+    letterState: [], lettersConfirmed: false,
+    questionAnswers: [], cmdAnswered: false,
+  });
+
+  // Reset UI
+  ['1','2','3','4'].forEach(n => {
+    document.getElementById('card'+n).className = 'card' + (n === '1' ? ' animate-in' : ' collapsed');
+    document.getElementById('badge'+n).className = 'feature-badge';
+    document.getElementById('badge'+n).textContent = n;
+    document.getElementById('status'+n).textContent = '—';
+    document.getElementById('status'+n).className = 'card-status pending';
+  });
+
+  document.getElementById('f1-yes').className = 'btn';
+  document.getElementById('f1-no').className = 'btn';
+  document.getElementById('resultSection').style.display = 'none';
+  document.getElementById('resultSection').innerHTML = '';
+
+  initLetters();
+  initRASS();
+  initF4();
+  setProgress(1);
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Start
+init();
+</script>
+</body>
+</html>
